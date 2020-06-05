@@ -23,6 +23,9 @@ Correspondence of Python types and Lisp types in cl4py:
 
 '''
 import reprlib
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 class LispObject:
     pass
@@ -96,10 +99,13 @@ class Symbol(LispObject):
     def python_name(self):
         name = self.name
         if name in python_name_translations:
+            logging.info("Translated lisp {} to python {}".format(name, python_name_translations[name]))
             return python_name_translations[name]
         else:
+            old_name = name
             for (old, new) in python_name_substitutions.items():
                 name = name.replace(old, new)
+            logging.info("Translated lisp {} to python {}".format(old_name, name))
             return name.lower()
 
 
@@ -118,6 +124,7 @@ class Package(LispObject, type(reprlib)):
 
 class Cons (LispObject):
     def __init__(self, car, cdr):
+        logging.info("Created new cons {} {}".format(car, cdr))
         self.car = car
         self.cdr = cdr
 
@@ -241,6 +248,7 @@ class LispWrapper (LispObject):
 
     def __call__(self, *args, **kwargs):
         restAndKeys = [ Quote(arg) for arg in args ]
+        logging.info("restAndKeys: {}".format(restAndKeys))
         for key, value in kwargs.items():
             restAndKeys.append(Keyword(key.upper()))
             restAndKeys.append(Quote(value))

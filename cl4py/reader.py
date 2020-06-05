@@ -8,6 +8,8 @@ from enum import Enum
 from .data import *
 from .circularity import *
 
+logging.basicConfig(level=logging.DEBUG)
+
 # An implementation of the Common Lisp reader algorithm, with the following
 # simplifications and changes:
 #
@@ -160,17 +162,21 @@ class Readtable:
 
 
     def parse(self, token):
+        logging.info("Parsing: {}".format(token))
         # integer
         m = re.fullmatch(integer_regex, token)
         if m:
+            logging.info("Parsed {} as integer".format(token))
             return int(m.group(0))
         # ratio
         m = re.fullmatch(ratio_regex, token)
         if m:
+            logging.info("Parsed {} as ratio".format(token))
             return Fraction(int(m.group(1)), int(m.group(2)))
         # float
         m = re.fullmatch(float_regex, token)
         if m:
+            logging.info("Parsed {} as float".format(token))
             base = m.group(1)
             exponent_marker = m.group(2)
             exponent = m.group(3)
@@ -187,6 +193,7 @@ class Readtable:
         # symbol
         m = re.fullmatch(symbol_regex, token)
         if m:
+            logging.info("Parsed {} as symbol".format(token))
             package = m.group(1)
             delimiter = m.group(2)
             name = m.group(3)
@@ -229,7 +236,10 @@ class Readtable:
 
 
 def left_parenthesis(r, s, c):
-    return r.read_delimited_list(')', s, True)
+    logging.info("Left parenthesis found, reading delimited list")
+    l = r.read_delimited_list(')', s, True)
+    logging.info("List read: {}".format(r))
+    return l
 
 
 def right_parenthesis(r, s, c):
@@ -237,6 +247,7 @@ def right_parenthesis(r, s, c):
 
 
 def left_curly_bracket(r, s, c):
+    logging.info("Left curly bracket found, reading delimited list")
     table = {}
     data = r.read_delimited_list('}', s, True)
     while data:
@@ -247,6 +258,7 @@ def left_curly_bracket(r, s, c):
         value = car(rest)
         table[key] = value
         data = cdr(rest)
+    logging.info("Table read: {}".format(table))
     return table
 
 
@@ -314,6 +326,7 @@ def sharpsign_backslash(r, s, c, n):
     else:
         key = ''.join(token).upper()
         if key in character_names:
+            logging.info("Reading special character {}".format(key))
             return character_names[key]
         else:
             raise RuntimeError('Not a valid character name: {}'.format('key'))
