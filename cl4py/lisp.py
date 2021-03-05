@@ -7,10 +7,12 @@ from pkg_resources import resource_filename
 from .data import *
 from .reader import Readtable
 from .writer import lispify
+import logging
+import sys
 
-
+logging.basicConfig(level=logging.DEBUG)
 class Lisp:
-    def __init__(self, cmd=['sbcl', '--script'], quicklisp=False):
+    def __init__(self, cmd=['sbcl', '--script'], quicklisp=False, debug=False):
         p = subprocess.Popen(cmd + [resource_filename(__name__, 'py.lisp')],
                              stdin = subprocess.PIPE,
                              stdout = subprocess.PIPE,
@@ -31,17 +33,24 @@ class Lisp:
         # This allows us to patch these instances later.
         self.unpatched_instances = {}
         # If debug is true, cl4py will print plenty of debug information.
-        self.debug = False
+        self.debug = debug
         # Finally, check whether the user wants quicklisp to be available.
+        logging.info("Created new Lisp instance:\ncmd: {}\nquicklisp: {}\ndebug: {}".format(cmd, quicklisp, debug))
         if quicklisp:
+            logging.info("Installing QuickLisp...")
             install_and_load_quicklisp(self)
+            logging.info("QuickLisp installed.")
 
 
     def __del__(self):
         try:
+            logging.info("Deleting instance...")
             self.stdin.write('(cl-user:quit)\n')
+            logging.info("Instance deleted")
         except:
-            pass
+            logging.debug("Instance deletion failed.")
+            logging.debug(sys.exc_info()[0])
+            # pass
 
 
     def eval(self, expr):
@@ -60,6 +69,7 @@ class Lisp:
         if isinstance(err, Cons):
             condition = err.car
             msg = err.cdr.car if err.cdr else ""
+            logging.debug("Error being raised in lisp.py/eval.\nerr = {}\ncondition = {}\nmsg = {}".format(err, condition, msg))
             def init(self):
                 RuntimeError.__init__(self, msg)
             raise type(str(condition), (RuntimeError,),
@@ -72,38 +82,54 @@ class Lisp:
             cls = type(cls_name.python_name, (LispWrapper,), {})
             self.classes[cls_name] = cls
             alist = self.function('cl4py:class-information')(cls_name)
+            logging.info("Adding member functions for {}".format(cls_name))
             for cons in alist:
                 add_member_function(cls, cons.car, cons.cdr)
             for instance in instances:
+                logging.info("Patching {} with class {}".format(instance, cls_name))
                 instance.__class__ = cls
         # Finally, return the resulting values.
         if val == ():
+            logging.info("{} returns None".format(expr))
             return None
         elif val.cdr == ():
+            logging.info("{} returns {}".format(expr, val.car))
             return val.car
         else:
-            return tuple(val)
+            ret = tuple(val)
+            logging.info("{} returns {}".format(expr, ret))
+            return ret
 
 
     def find_package(self, name):
+        logging.info("Finding package {}".format(name))
         return self.function('CL:FIND-PACKAGE')(name)
+        # logging.info("Package {} Found: {}".format(name, p))
+        # return p
 
 
     def function(self, name):
-        return self.eval( ('CL:FUNCTION', name) )
+        logging.info("Evaluating {}".format(name))
+        e = self.eval( ('CL:FUNCTION', name) )
+        logging.info("Evaluated {} Found {}".format(name, e))
+        return e
 
 
 def add_member_function(cls, name, gf):
     class_name = cls.__name__
     method_name = name.python_name
+    logging.info("Adding member function. Method {}, Class {}".format(method_name, class_name))
     setattr(cls, method_name, lambda self, *args: gf(self, *args))
 
 
 def install_and_load_quicklisp(lisp):
+    logging.info("Installing QuickLisp")
     quicklisp_setup = os.path.expanduser('~/quicklisp/setup.lisp')
     if os.path.isfile(quicklisp_setup):
         lisp.function('cl:load')(quicklisp_setup)
+        logging.info("QuickLisp found already and loaded.")
     else:
+        logging.info("Installing from outside.")
         install_quicklisp(lisp)
 
 
@@ -116,3 +142,4 @@ def install_quicklisp(lisp):
         lisp.function('cl:load')(tmp.name)
     print('Installing Quicklisp...')
     lisp.eval( ('quicklisp-quickstart:install',) )
+    logging.info("QuickLisp installed from outside.")

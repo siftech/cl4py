@@ -5,6 +5,9 @@ import random
 from fractions import Fraction
 from .data import *
 from .circularity import *
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 def lispify(lisp, obj):
     return lispify_datum(decircularize(obj, lisp.readtable))
@@ -12,6 +15,7 @@ def lispify(lisp, obj):
 
 def lispify_datum(obj):
     lispifier = lispifiers.get(type(obj))
+    logging.info("obj {} is type {}".format(obj, lispifier))
     if lispifier:
         return lispifier(obj)
     elif isinstance(obj, LispWrapper):
